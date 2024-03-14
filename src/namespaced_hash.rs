@@ -1,5 +1,7 @@
 use crate::maybestd::{cmp, fmt, marker::PhantomData, vec::Vec};
 use sha2::{Digest, Sha256};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize, Serializer, ser::SerializeTuple, de, de::{Visitor, SeqAccess, Deserializer}};
 
 use crate::simple_merkle::tree::MerkleHash;
 /// The length of a hash in bytes
@@ -132,6 +134,53 @@ pub struct NamespaceId<const NS_ID_SIZE: usize>(pub [u8; NS_ID_SIZE]);
 impl<const NS_ID_SIZE: usize> Default for NamespaceId<NS_ID_SIZE> {
     fn default() -> Self {
         Self([0; NS_ID_SIZE])
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<const NS_ID_SIZE: usize> Serialize for NamespaceId<NS_ID_SIZE> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_tuple(NS_ID_SIZE)?;
+        for element in self.0.iter() {
+            seq.serialize_element(element)?;
+        }
+        seq.end()
+    }
+}
+
+struct NamespaceIdVisitor<const NS_ID_SIZE: usize>;
+
+#[cfg(feature = "serde")]
+impl<'de, const NS_ID_SIZE: usize> Visitor<'de> for NamespaceIdVisitor<NS_ID_SIZE> {
+    type Value = NamespaceId<NS_ID_SIZE>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a sequence of bytes")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut id = [0; NS_ID_SIZE];
+        for i in 0..NS_ID_SIZE {
+            id[i] = seq.next_element()?
+                .ok_or_else(|| de::Error::invalid_length(i, &self))?;
+        }
+        Ok(NamespaceId(id))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, const NS_ID_SIZE: usize> Deserialize<'de> for NamespaceId<NS_ID_SIZE> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_tuple(NS_ID_SIZE, NamespaceIdVisitor)
     }
 }
 
