@@ -4,6 +4,8 @@ use std::cmp::min;
 use std::rc::{Rc, Weak};
 use std::cell::RefCell;
 use thiserror::Error;
+#[cfg(feature = "serde")]
+use serde::{Serialize, Deserialize};
 
 /// Error type for TMTree operations
 #[derive(Error, Debug)]
@@ -37,6 +39,7 @@ pub struct ProofNode {
 
 /// Merkle proof
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Proof {
     /// Total number of leaves
     pub total: i64,
@@ -189,7 +192,6 @@ pub fn compute_hash_from_aunts(index: i64, total: i64, leaf_hash: [u8; 32], inne
 impl Proof {
     /// Verify the proof
     pub fn verify(&self, root_hash: [u8; 32]) -> bool {
-        println!("len aunts: {:?}", self.aunts.len());
         let computed_hash = compute_hash_from_aunts(self.index, self.total, self.leaf_hash, self.aunts.clone()).unwrap();
         computed_hash == root_hash
     }
