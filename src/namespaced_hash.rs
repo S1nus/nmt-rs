@@ -14,6 +14,21 @@ pub const LEAF_DOMAIN_SEPARATOR: [u8; 1] = [0u8];
 /// A domain separator indicating that a node is internal
 pub const INTERNAL_NODE_DOMAIN_SEPARATOR: [u8; 1] = [1u8];
 
+/// A sha256 hasher without namespacing
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SimpleSha2Hasher {}
+impl Default for SimpleSha2Hasher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl SimpleSha2Hasher {
+    /// Create a new sha256 hasher
+    pub fn new() -> Self {
+        Self {}
+    }
+}
 /// A sha256 hasher which also supports namespacing
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -75,6 +90,22 @@ pub trait NamespaceMerkleHasher<const NS_ID_SIZE: usize>: MerkleHash {
         data: &[u8],
         namespace: NamespaceId<NS_ID_SIZE>,
     ) -> <Self as MerkleHash>::Output;
+}
+
+impl MerkleHash for SimpleSha2Hasher {
+    type Output = [u8; 32];
+    const EMPTY_ROOT: Self::Output = [0u8; 32];
+    fn hash_leaf(&self, data: &[u8]) -> Self::Output {
+        let mut hasher = Sha256::new();
+        hasher.update(data);
+        hasher.finalize().into()
+    }
+    fn hash_nodes(&self, left: &Self::Output, right: &Self::Output) -> Self::Output {
+        let mut hasher = Sha256::new();
+        hasher.update(left);
+        hasher.update(right);
+        hasher.finalize().into()
+    }
 }
 
 impl<const NS_ID_SIZE: usize> MerkleHash for NamespacedSha2Hasher<NS_ID_SIZE> {
