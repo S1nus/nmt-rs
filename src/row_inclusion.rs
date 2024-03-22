@@ -42,9 +42,9 @@ pub struct ProofNode {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Proof {
     /// Total number of leaves
-    pub total: i64,
+    pub total: u32,
     /// Index of the leaf
-    pub index: i64,
+    pub index: u32,
     /// Hash of the leaf
     pub leaf_hash: [u8; 32],
     /// Aunts of the leaf
@@ -151,11 +151,11 @@ pub fn proofs_from_byte_slices(items: &[&[u8]]) -> ([u8; 32], Vec<Proof>) {
     let proofs = trails.iter().enumerate().map(|(i, trail)| {
         let aunts = trail.as_ref().borrow().flatten_aunts();
         let leaf_hash = trail.as_ref().borrow().hash.clone();
-        let total = items.len() as i64;
+        let total = items.len() as u32;
         let index = i;
         Proof {
             total,
-            index: i as i64,
+            index: i as u32,
             leaf_hash,
             aunts,
         }
@@ -164,7 +164,7 @@ pub fn proofs_from_byte_slices(items: &[&[u8]]) -> ([u8; 32], Vec<Proof>) {
 }
 
 /// Compute the root hash from aunts
-pub fn compute_hash_from_aunts(index: i64, total: i64, leaf_hash: [u8; 32], inner_hashes: Vec<[u8; 32]>) -> Result<[u8; 32], TreeError> {
+pub fn compute_hash_from_aunts(index: u32, total: u32, leaf_hash: [u8; 32], inner_hashes: Vec<[u8; 32]>) -> Result<[u8; 32], TreeError> {
     if index > total || index < 0 || total <= 0 {
         return Err(TreeError::IndexError)
     }
@@ -180,7 +180,7 @@ pub fn compute_hash_from_aunts(index: i64, total: i64, leaf_hash: [u8; 32], inne
     if inner_hashes.len()  == 0 {
         return Err(TreeError::ExpectedInnerHash)
     }
-    let num_left = get_split_point(total as u32) as i64;
+    let num_left = get_split_point(total);
     if index < num_left {
         let left_hash = compute_hash_from_aunts(index, num_left, leaf_hash, inner_hashes[..inner_hashes.len() - 1].to_vec())?;
         return Ok(inner_hash(&left_hash, &inner_hashes[inner_hashes.len() - 1]))
