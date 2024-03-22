@@ -49,6 +49,8 @@ pub use namespaced_hash::*;
 // pub mod db;
 pub mod nmt_proof;
 pub mod simple_merkle;
+/// Row inclusion module
+pub mod row_inclusion;
 
 const CELESTIA_NS_ID_SIZE: usize = 29;
 /// A namespaced merkle tree as used in Celestia. Uses a sha256 hasher and 29 byte namespace IDs.

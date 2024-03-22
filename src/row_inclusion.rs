@@ -5,37 +5,55 @@ use std::rc::{Rc, Weak};
 use std::cell::RefCell;
 use thiserror::Error;
 
+/// Error type for TMTree operations
 #[derive(Error, Debug)]
 pub enum TreeError {
+    /// Invalid index
     #[error("Invalid index")]
     IndexError,
+    /// Inner hash is zero
     #[error("Inner hash error")]
     InnerHashZeroError,
+    /// Total is 1, inner_hashes must be zero
     #[error("total is 1, inner_hashes must be zero")]
     TotalInnerHashMismatch,
+    /// Total is 1, inner_hashes must be zero
     #[error("Expected inner hashes")]
     ExpectedInnerHash,
 }
 
+/// Node of a merkle proof
 #[derive(Clone, Debug)]
 pub struct ProofNode {
+    /// Hash of the node
     pub hash: [u8; 32],
+    /// Parent of the node
     pub parent: Option<Rc<RefCell<ProofNode>>>,
+    /// Left child of the node
     pub left: Option<Rc<RefCell<ProofNode>>>,
+    /// Right child of the node
     pub right: Option<Rc<RefCell<ProofNode>>>,
 }
 
+/// Merkle proof
 #[derive(Debug)]
 pub struct Proof {
+    /// Total number of leaves
     pub total: i64,
+    /// Index of the leaf
     pub index: i64,
+    /// Hash of the leaf
     pub leaf_hash: [u8; 32],
+    /// Aunts of the leaf
     pub aunts: Vec<[u8; 32]>,
 }
 
+/// Prefix for the leaf hash
 pub const LEAF_PREFIX: &[u8] = &[0];
+/// Prefix for the inner hash
 pub const INNER_PREFIX: &[u8] = &[1];
 
+/// Compute the hash of a byte slice
 pub fn hash(bytes: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
@@ -43,24 +61,27 @@ pub fn hash(bytes: &[u8]) -> [u8; 32] {
     result
 }
 
+/// Compute the hash of an empty byte slice
 pub fn empty_hash() -> [u8; 32] {
     hash(&[])
 }
 
+/// Compute the hash of a leaf node
 pub fn leaf_hash(bytes: &[u8]) -> [u8; 32] {
     hash([LEAF_PREFIX, bytes].concat().as_slice())
 }
 
+/// Compute the hash of an inner node
 pub fn inner_hash(left: &[u8], right: &[u8]) -> [u8; 32] {
     hash([INNER_PREFIX, left, right].concat().as_slice())
 }
 
-// rewrite this to arithetic-based computation
-// make it easier for zk prover
-fn get_split_point(length: u32) -> u32 {
+/// Get the split point of a length
+pub fn get_split_point(length: u32) -> u32 {
     length.next_power_of_two() / 2
 }
 
+/// Compute the hash of a list of byte slices
 pub fn hash_from_byte_slices(items: &[&[u8]]) -> [u8; 32] {
     match items.len() {
         0 => empty_hash(),
@@ -74,6 +95,7 @@ pub fn hash_from_byte_slices(items: &[&[u8]]) -> [u8; 32] {
     }
 }
 
+/// Compute the trails from byte slices
 pub fn trails_from_byte_slices(items: &[&[u8]]) -> (Vec<Rc<RefCell<ProofNode>>>, Rc<RefCell<ProofNode>>) {
     match items.len() {
         0 => (vec![], Rc::new(RefCell::new(ProofNode {
@@ -119,6 +141,7 @@ pub fn trails_from_byte_slices(items: &[&[u8]]) -> (Vec<Rc<RefCell<ProofNode>>>,
     }
 }
 
+/// Compute proofs from byte slices
 pub fn proofs_from_byte_slices(items: &[&[u8]]) -> ([u8; 32], Vec<Proof>) {
     let (trails, root) = trails_from_byte_slices(items);
     let root_hash = root.as_ref().borrow().hash.clone();
@@ -137,6 +160,7 @@ pub fn proofs_from_byte_slices(items: &[&[u8]]) -> ([u8; 32], Vec<Proof>) {
     (root_hash, proofs)
 }
 
+/// Compute the root hash from aunts
 pub fn compute_hash_from_aunts(index: i64, total: i64, leaf_hash: [u8; 32], inner_hashes: Vec<[u8; 32]>) -> Result<[u8; 32], TreeError> {
     if index > total || index < 0 || total <= 0 {
         return Err(TreeError::IndexError)
@@ -163,6 +187,7 @@ pub fn compute_hash_from_aunts(index: i64, total: i64, leaf_hash: [u8; 32], inne
 }
 
 impl Proof {
+    /// Verify the proof
     pub fn verify(&self, root_hash: [u8; 32]) -> bool {
         println!("len aunts: {:?}", self.aunts.len());
         let computed_hash = compute_hash_from_aunts(self.index, self.total, self.leaf_hash, self.aunts.clone()).unwrap();
@@ -171,6 +196,7 @@ impl Proof {
 }
 
 impl ProofNode {
+    /// Flatten the aunts of the node
     pub fn flatten_aunts(&self) -> Vec<[u8; 32]> {
         let mut inner_hashes: Vec<[u8; 32]> = vec![];
         let mut node: Option<Rc<RefCell<ProofNode>>> = Some(Rc::new(RefCell::new(self.clone())));
