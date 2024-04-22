@@ -11,7 +11,7 @@ homepage = "https://www.sovereign.xyz"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sha2 = {git = "https://github.com/s1nus/zkvm-hashes"}
+sha2 = {git = "https://github.com/S1nus/RustCrypto-hashes-zkvm.git"}
 bytes = { version = "1", default-features = false }
 serde = { version = "1", optional = true, features = ["derive"] }
 borsh = { version = "0.10.0", optional = true }
