@@ -417,12 +417,14 @@ pub enum RangeProofType {
 #[cfg(test)]
 mod tests {
     use crate::maybestd::{format, vec::Vec};
+    use crate::simple_merkle::tree::{self, MerkleHash, MerkleTree};
     use crate::NamespaceMerkleHasher;
     use crate::{
         namespaced_hash::{NamespaceId, NamespacedSha2Hasher},
         nmt_proof::NamespaceProof,
         simple_merkle::db::MemDb,
         NamespaceMerkleTree, NamespacedHash, RangeProofType, CELESTIA_NS_ID_SIZE,
+        row_inclusion::*,
     };
 
     type DefaultNmt<const NS_ID_SIZE: usize> = NamespaceMerkleTree<
@@ -456,6 +458,65 @@ mod tests {
     /// Builds a tree with N leaves
     fn tree_with_n_leaves<const NS_ID_SIZE: usize>(n: usize) -> DefaultNmt<NS_ID_SIZE> {
         tree_from_namespace_ids((0..n as u64).collect::<Vec<_>>())
+    }
+
+    #[test]
+    fn compute_empty_hash() {
+        use sha2::{Sha256, Digest};
+        pub fn hash(bytes: &[u8]) -> [u8; 32] {
+            let mut hasher = Sha256::new();
+            hasher.update(bytes);
+            let result: [u8; 32] = hasher.finalize().into();
+            result
+        }
+        assert_eq!(hash(&[]), [227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39, 174, 65, 228, 100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85]);
+    }
+    #[test]
+    fn test_tm_merkle() {
+
+        use sha2::{Sha256, Digest};
+
+        let leaves: Vec<&[u8]> = vec![b"leaf_1", b"leaf_2", b"leaf_3", b"leaf_4"];
+
+        pub fn hash(bytes: &[u8]) -> [u8; 32] {
+            let mut hasher = Sha256::new();
+            hasher.update(bytes);
+            let result: [u8; 32] = hasher.finalize().into();
+            result
+        }
+
+        pub const LEAF_PREFIX: &[u8] = &[0];
+        pub const INNER_PREFIX: &[u8] = &[1];
+
+        pub fn leaf_hash(bytes: &[u8]) -> [u8; 32] {
+            hash([LEAF_PREFIX, bytes].concat().as_slice())
+        }
+
+        pub fn inner_hash(left: &[u8], right: &[u8]) -> [u8; 32] {
+            hash([INNER_PREFIX, left, right].concat().as_slice())
+        }
+
+        pub struct TmSha2Hasher{};
+        impl MerkleHash for TmSha2Hasher {
+            type Output = [u8; 32];
+
+            const EMPTY_ROOT : Self::Output = [227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39, 174, 65, 228, 100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85];
+
+            fn hash_leaf(&self, data: &[u8]) -> Self::Output {
+                leaf_hash(data)
+            }
+            fn hash_nodes(&self, left: &Self::Output, right: &Self::Output) -> Self::Output {
+                inner_hash(left, right)
+            }
+        }
+
+        let hasher = TmSha2Hasher{};
+        let mut tree: MerkleTree<MemDb<[u8; 32]>, TmSha2Hasher> = MerkleTree::with_hasher(hasher);
+        leaves.iter().for_each(|leaf| {
+            tree.push_raw_leaf(leaf);
+        });
+        let hash_from_byte_slices = hash_from_byte_slices(&leaves);
+        assert_eq!(tree.root(), hash_from_byte_slices);
     }
 
     #[test]
